@@ -10,7 +10,7 @@ Copyright 2014 David W. Hogg (NYU) and Dustin Lang (CMU).
 import numpy as np
 import astropy.io.fits as pf
 
-def populate_A_matrix(basis_image):
+def populate_A_matrix(ones, image):
     """
     ## bugs:
     - Needs more information in this comment header.
@@ -18,34 +18,34 @@ def populate_A_matrix(basis_image):
     - Ought to have user-settable order and options related to model complexity.
     - There must be a MUCH faster way to write this.
     """
-    ny, nx = basis_image.shape
+    ny, nx = image.shape
     npix = nx * ny
     A = np.zeros((10, npix))
-    A[0] = np.ones(npix)
-    A[1] = basis_image.reshape(npix)
+    A[0] = ones.reshape(npix)
+    A[1] = image.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[:, :-1] = basis_image[:, 1:]
+    foo[:, :-1] = image[:, 1:]
     A[2] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[:, 1:] = basis_image[:, :-1]
+    foo[:, 1:] = image[:, :-1]
     A[3] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[:-1] = basis_image[1:]
+    foo[:-1] = image[1:]
     A[4] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[1:] = basis_image[:-1]
+    foo[1:] = image[:-1]
     A[5] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[:-1, :-1] = basis_image[1:, 1:]
+    foo[:-1, :-1] = image[1:, 1:]
     A[6] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[:-1, 1:] = basis_image[1:, :-1]
+    foo[:-1, 1:] = image[1:, :-1]
     A[7] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[1:, :-1] = basis_image[:-1, 1:]
+    foo[1:, :-1] = image[:-1, 1:]
     A[8] = foo.reshape(npix)
     foo = np.zeros((ny, nx))
-    foo[1:, 1:] = basis_image[:-1, :-1]
+    foo[1:, 1:] = image[:-1, :-1]
     A[9] = foo.reshape(npix)
     return A
 
@@ -71,13 +71,13 @@ def synthesize_image(image_to_synthesize, weight_image, basis_image):
     assert weight_image.shape == image_to_synthesize.shape
     assert basis_image.shape == image_to_synthesize.shape
     ny, nx = image_to_synthesize.shape
-    yg = np.arange(ny) + 0.5 - 0.5 * ny
-    xg = np.arange(nx) + 0.5 - 0.5 * nx
+    xg = (np.arange(nx) + 0.5 - 0.5 * nx) * 2. / nx
+    yg = (np.arange(ny) + 0.5 - 0.5 * ny) * 2. / ny
     yg, xg = np.meshgrid(xg, yg)
+    A = np.vstack((populate_A_matrix(np.ones((ny, nx)), basis_image),
+                   populate_A_matrix(xg, xg * basis_image),
+                   populate_A_matrix(yg, yg * basis_image)))
     npix = ny * nx
-    A = np.vstack((populate_A_matrix(basis_image),
-                   populate_A_matrix(xg * basis_image),
-                   populate_A_matrix(yg * basis_image)))
     W = weight_image.reshape(npix)
     ATA = np.dot(W[None, :] * A, A.T)
     ATb = np.dot(W[None, :] * A, image_to_synthesize.reshape(npix))
@@ -85,7 +85,7 @@ def synthesize_image(image_to_synthesize, weight_image, basis_image):
     return np.dot(A.T, pars).reshape((ny, nx))
 
 if __name__ == "__main__":
-    new = np.ones((3, 5))
-    weight = np.ones((3, 5))
-    old = np.random.uniform(size=(3, 5))
-    print synthesize_image(new, weight, old)
+    new = np.random.normal(size=(1700, 1500))
+    weight = np.ones((1700, 1500))
+    old = np.random.uniform(size=(1700, 1500))
+    print new - synthesize_image(new, weight, old)
