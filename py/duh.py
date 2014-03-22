@@ -3,12 +3,17 @@ This file is part of the Duh project.
 Copyright 2014 David W. Hogg (NYU) and Dustin Lang (CMU).
 
 ## bugs
-* not yet written
-* does nothing
+* No output.
+* Needs some kind of robust sigma estimation.
+* Needs some kind of IRLS or sigma-clipping.
 """
 
+if __name__ == '__main__':
+    import matplotlib
+    matplotlib.use('Agg')
 import numpy as np
 import astropy.io.fits as pf
+import pylab as plt
 
 def populate_A_matrix(ones, image):
     """
@@ -84,7 +89,47 @@ def synthesize_image(image_to_synthesize, weight_image, basis_image):
     pars = np.linalg.solve(ATA, ATb)
     return np.dot(A.T, pars).reshape((ny, nx))
 
+def synthesize_and_plot(fn1, fn2, fn):
+    data_j2c = pf.open(fn1)[0].data
+    data_j3c = pf.open(fn2)[0].data
+    weight = np.ones_like(data_j2c)
+    synth_j2c_j3c = synthesize_image(data_j2c, weight, data_j3c)
+    resid_j2c_j3c = data_j2c - synth_j2c_j3c
+
+    plt.clf()
+    plt.subplot(221)
+    plt.gray()
+    vmin_j2c = np.percentile(data_j2c, 5.)
+    vmax_j2c = np.percentile(data_j2c, 95.)
+    y1 = 300
+    y2 = y1 + 200
+    x1 = 300
+    x2 = x1 + 200
+    plt.imshow(data_j2c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c, vmax=vmax_j2c)
+    plt.title(fn1)
+
+    plt.subplot(222)
+    vmin_j3c = np.percentile(data_j3c, 5.)
+    vmax_j3c = np.percentile(data_j3c, 95.)
+    plt.imshow(data_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j3c, vmax=vmax_j3c)
+    plt.title(fn2)
+
+    plt.subplot(223)
+    plt.imshow(synth_j2c_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c, vmax=vmax_j2c)
+    plt.title("synthetic " + fn1)
+
+    plt.subplot(224)
+    diff = np.median(data_j2c) - np.median(resid_j2c_j3c)
+    plt.imshow(resid_j2c_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c - diff, vmax=vmax_j2c - diff)
+    plt.title("residual")
+    plt.savefig(fn)
+    return None
+
 if __name__ == "__main__":
+    synthesize_and_plot("j2c.fits", "j3c.fits", "compare_j2c_j3c.png")
+    synthesize_and_plot("j3c.fits", "j2c.fits", "compare_j3c_j2c.png")
+
+if False:
     new = np.random.normal(size=(1700, 1500))
     weight = np.ones((1700, 1500))
     old = np.random.uniform(size=(1700, 1500))
