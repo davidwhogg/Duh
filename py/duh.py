@@ -82,9 +82,9 @@ def synthesize_image(image_to_synthesize, weight_image, basis_image):
     xg = (np.arange(nx) + 0.5 - 0.5 * nx) * 2. / nx
     yg = (np.arange(ny) + 0.5 - 0.5 * ny) * 2. / ny
     yg, xg = np.meshgrid(xg, yg)
-    A = np.vstack((populate_A_matrix(np.ones((ny, nx)), basis_image, nhalf=3),
-                   populate_A_matrix(xg, xg * basis_image),
-                   populate_A_matrix(yg, yg * basis_image)))
+    A = np.vstack((populate_A_matrix(np.ones((ny, nx)), basis_image, nhalf=6),
+                   populate_A_matrix(xg, xg * basis_image, nhalf=1),
+                   populate_A_matrix(yg, yg * basis_image, nhalf=1)))
     npix = ny * nx
     W = weight_image.reshape(npix)
     ATA = np.dot(W[None, :] * A, A.T)
@@ -92,7 +92,7 @@ def synthesize_image(image_to_synthesize, weight_image, basis_image):
     pars = np.linalg.solve(ATA, ATb)
     return np.dot(A.T, pars).reshape((ny, nx))
 
-def iterative_reweight_synthesize_image(data_j2c, invvar, data_j3c):
+def iterative_reweight_synthesize_image(data1, invvar, data2):
     """
     ## bugs:
     - DOES NOTHING.
@@ -100,38 +100,51 @@ def iterative_reweight_synthesize_image(data_j2c, invvar, data_j3c):
     """
     new_invvar = invvar
     for ii in range(5):
-        diff = synthesize_image(data_j2c, new_invvar, data_j3c) - data_j2c # use new invvar here
+        diff = synthesize_image(data1, new_invvar, data2) - data1 # use new invvar here
         chi2 = invvar * (diff ** 2) # use original invvar here
         factor = (chi2 + 25.) / 25. # MAGIC 25.
         new_invvar = invvar / factor # update new invvar here
-        print "median invvar, chi2, new_invvar", np.median(invvar), np.median(chi2), np.median(new_invvar)
-    return synthesize_image(data_j2c, new_invvar, data_j3c), new_invvar
+        I = invvar > 0
+        print "median invvar, chi2, new_invvar", np.median(invvar[I]), np.median(chi2[I]), np.median(new_invvar[I])
+    return synthesize_image(data1, new_invvar, data2), new_invvar
 
-def synthesize_and_plot(fn1, fn2, fn):
-    data_j2c = pf.open(fn1)[0].data
-    data_j3c = pf.open(fn2)[0].data
+def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
+    """
+    ## bugs:
+    - No comment header.
+    """
+    data1 = pf.open(fn1)[0].data
+    data2 = pf.open(fn2)[0].data
 
-    sigma_j2c = np.median(data_j2c) - np.percentile(data_j2c, 16.)
-    invvar = np.zeros_like(data_j2c) + 1. / (sigma_j2c * sigma_j2c)
-    synth_j2c_j3c, new_invvar = iterative_reweight_synthesize_image(data_j2c, invvar, data_j3c)
-    resid_j2c_j3c = data_j2c - synth_j2c_j3c
+    sigma1 = np.median(data1[data1 != 0]) - np.percentile(data1[data1 != 0], 16.)
+    invvar = np.zeros_like(data1) + 1. / (sigma1 * sigma1)
+    invvar[~np.isfinite(data1)] = 0.
+    data1[~np.isfinite(data1)] = 0.
+    data2[~np.isfinite(data2)] = 0.
+    if maskzero:
+        invvar[data1 == 0] = 0.
+        invvar[data2 == 0] = 0.
+    synth12, new_invvar = iterative_reweight_synthesize_image(data1, invvar, data2)
+    resid12 = data1 - synth12
 
+    plt.figure(figsize=(9, 6), dpi=600)
     plt.clf()
     plt.subplot(231)
     plt.gray()
-    vmin_j2c = np.percentile(data_j2c, 1.)
-    vmax_j2c = np.percentile(data_j2c, 99.)
-    y1 = 200
-    y2 = y1 + 400
-    x1 = 200
-    x2 = x1 + 400
-    plt.imshow(data_j2c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c, vmax=vmax_j2c)
+    vmin1 = np.percentile(data1, 1.)
+    vmax1 = np.percentile(data1, 99.)
+    ny, nx = data1.shape
+    y1 = 0
+    y2 = ny
+    x1 = 0
+    x2 = nx
+    plt.imshow(data1[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1, vmax=vmax1)
     plt.title(fn1)
 
     plt.subplot(232)
-    vmin_j3c = np.percentile(data_j3c, 5.)
-    vmax_j3c = np.percentile(data_j3c, 95.)
-    plt.imshow(data_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j3c, vmax=vmax_j3c)
+    vmin2 = np.percentile(data2, 5.)
+    vmax2 = np.percentile(data2, 95.)
+    plt.imshow(data2[y1: y2, x1: x2], interpolation="nearest", vmin=vmin2, vmax=vmax2)
     plt.title(fn2)
 
     plt.subplot(233)
@@ -139,24 +152,28 @@ def synthesize_and_plot(fn1, fn2, fn):
     plt.title("sqrt inverse variance")
 
     plt.subplot(234)
-    plt.imshow(synth_j2c_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c, vmax=vmax_j2c)
+    plt.imshow(synth12[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1, vmax=vmax1)
     plt.title("synthetic " + fn1)
 
     plt.subplot(235)
-    diff = np.median(data_j2c) - np.median(resid_j2c_j3c)
-    plt.imshow(resid_j2c_j3c[y1: y2, x1: x2], interpolation="nearest", vmin=vmin_j2c - diff, vmax=vmax_j2c - diff)
+    diff = np.median(data1) - np.median(resid12)
+    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1 - diff, vmax=vmax1 - diff)
     plt.title("residual")
 
     plt.subplot(236)
-    plt.imshow((np.sqrt(new_invvar) * resid_j2c_j3c)[y1: y2, x1: x2], interpolation="nearest", vmin=-5., vmax=5.)
+    plt.imshow((np.sqrt(new_invvar) * resid12)[y1: y2, x1: x2], interpolation="nearest", vmin=-5., vmax=5.)
     plt.title("chi image")
 
     plt.savefig(fn)
     return None
 
 if __name__ == "__main__":
-    synthesize_and_plot("j2c.fits", "j3c.fits", "compare_j2c_j3c.png")
-    synthesize_and_plot("j3c.fits", "j2c.fits", "compare_j3c_j2c.png")
+    synthesize_and_plot("j2c.fits", "j3c.fits", "compare_j2c_j3c.pdf")
+    synthesize_and_plot("j3c.fits", "j2c.fits", "compare_j3c_j2c.pdf")
+
+if False:
+    synthesize_and_plot("h.fits", "j2c.fits", "compare_h_j2c.png", maskzero=True)
+    synthesize_and_plot("h.fits", "j3c.fits", "compare_h_j3c.png", maskzero=True)
 
 if False:
     new = np.random.normal(size=(1700, 1500))
