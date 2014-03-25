@@ -3,9 +3,7 @@ This file is part of the Duh project.
 Copyright 2014 David W. Hogg (NYU) and Dustin Lang (CMU).
 
 ## bugs
-* No output.
-* Needs some kind of robust sigma estimation.
-* Needs some kind of IRLS or sigma-clipping.
+* No output of any use.
 """
 
 if __name__ == '__main__':
@@ -127,7 +125,7 @@ def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
     synth12, new_invvar = iterative_reweight_synthesize_image(data1, invvar, data2)
     resid12 = data1 - synth12
 
-    plt.figure(figsize=(9, 6), dpi=600)
+    plt.figure(figsize=(18, 12))
     plt.clf()
     plt.subplot(231)
     plt.gray()
@@ -138,38 +136,38 @@ def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
     y2 = ny
     x1 = 0
     x2 = nx
-    plt.imshow(data1[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1, vmax=vmax1)
+    plt.imshow(data1[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1, vmax=vmax1)
     plt.title(fn1)
 
     plt.subplot(232)
     vmin2 = np.percentile(data2, 5.)
     vmax2 = np.percentile(data2, 95.)
-    plt.imshow(data2[y1: y2, x1: x2], interpolation="nearest", vmin=vmin2, vmax=vmax2)
+    plt.imshow(data2[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin2, vmax=vmax2)
     plt.title(fn2)
 
     plt.subplot(233)
-    plt.imshow(np.sqrt(new_invvar)[y1: y2, x1: x2], interpolation="nearest")
+    plt.imshow(np.sqrt(new_invvar)[y1: y2, x1: x2], interpolation="nearest", origin="lower")
     plt.title("sqrt inverse variance")
 
     plt.subplot(234)
-    plt.imshow(synth12[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1, vmax=vmax1)
+    plt.imshow(synth12[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1, vmax=vmax1)
     plt.title("synthetic " + fn1)
 
     plt.subplot(235)
     diff = np.median(data1) - np.median(resid12)
-    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", vmin=vmin1 - diff, vmax=vmax1 - diff)
+    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1 - diff, vmax=vmax1 - diff)
     plt.title("residual")
 
     plt.subplot(236)
-    plt.imshow((np.sqrt(new_invvar) * resid12)[y1: y2, x1: x2], interpolation="nearest", vmin=-5., vmax=5.)
+    plt.imshow((np.sqrt(new_invvar) * resid12)[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=-5., vmax=5.)
     plt.title("chi image")
 
     plt.savefig(fn)
     return None
 
 if __name__ == "__main__":
-    synthesize_and_plot("j2c.fits", "j3c.fits", "compare_j2c_j3c.pdf")
-    synthesize_and_plot("j3c.fits", "j2c.fits", "compare_j3c_j2c.pdf")
+    synthesize_and_plot("j2c.fits", "j3c.fits", "compare_j2c_j3c.png")
+    synthesize_and_plot("j3c.fits", "j2c.fits", "compare_j3c_j2c.png")
 
 if False:
     synthesize_and_plot("h.fits", "j2c.fits", "compare_h_j2c.png", maskzero=True)
