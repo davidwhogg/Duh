@@ -10,7 +10,6 @@ if __name__ == '__main__':
     import matplotlib
     matplotlib.use('Agg')
 import numpy as np
-import astropy.io.fits as pf
 import pylab as plt
 
 def populate_A_matrix(ones, image, nhalf=1):
@@ -103,18 +102,15 @@ def iterative_reweight_synthesize_image(data1, invvar, data2):
         factor = (chi2 + 25.) / 25. # MAGIC 25.
         new_invvar = invvar / factor # update new invvar here
         I = invvar > 0
-        print("median invvar, chi2, new_invvar", np.median(invvar[I]), np.median(chi2[I]), np.median(new_invvar[I]))
+        print("median invvar, chi2, new_invvar", np.nanmedian(invvar[I]), np.nanmedian(chi2[I]), np.nanmedian(new_invvar[I]))
     return synthesize_image(data1, new_invvar, data2), new_invvar
 
-def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
+def synthesize_and_plot(data1, data2, fn, maskzero=False):
     """
     ## bugs:
     - No comment header.
     """
-    data1 = pf.open(fn1)[0].data
-    data2 = pf.open(fn2)[0].data
-
-    sigma1 = np.median(data1[data1 != 0]) - np.percentile(data1[data1 != 0], 16.)
+    sigma1 = np.nanmedian(data1[data1 != 0]) - np.nanpercentile(data1[data1 != 0], 16.)
     invvar = np.zeros_like(data1) + 1. / (sigma1 * sigma1)
     invvar[~np.isfinite(data1)] = 0.
     data1[~np.isfinite(data1)] = 0.
@@ -137,13 +133,13 @@ def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
     x1 = 0
     x2 = nx
     plt.imshow(data1[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1, vmax=vmax1)
-    plt.title(fn1)
+    plt.title("first input")
 
     plt.subplot(232)
     vmin2 = np.percentile(data2, 5.)
     vmax2 = np.percentile(data2, 95.)
     plt.imshow(data2[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin2, vmax=vmax2)
-    plt.title(fn2)
+    plt.title("second input")
 
     plt.subplot(233)
     plt.imshow(np.sqrt(new_invvar)[y1: y2, x1: x2], interpolation="nearest", origin="lower")
@@ -151,15 +147,15 @@ def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
 
     plt.subplot(234)
     plt.imshow(synth12[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1, vmax=vmax1)
-    plt.title("synthetic " + fn1)
+    plt.title("synthetic version of first image")
 
     plt.subplot(235)
-    diff = np.median(data1) - np.median(resid12)
-    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=vmin1 - diff, vmax=vmax1 - diff)
+    vmax = (vmax1 - vmin1) / 2.
+    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", origin="lower", cmap="RdBu", vmin=-vmax, vmax=vmax)
     plt.title("residual")
 
     plt.subplot(236)
-    plt.imshow((np.sqrt(new_invvar) * resid12)[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=-5., vmax=5.)
+    plt.imshow((np.sqrt(new_invvar) * resid12)[y1: y2, x1: x2], interpolation="nearest", origin="lower", cmap="RdBu", vmin=-5., vmax=5.)
     plt.title("chi image")
 
     plt.savefig(fn)
