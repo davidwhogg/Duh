@@ -103,7 +103,7 @@ def iterative_reweight_synthesize_image(data1, invvar, data2):
         factor = (chi2 + 25.) / 25. # MAGIC 25.
         new_invvar = invvar / factor # update new invvar here
         I = invvar > 0
-        print "median invvar, chi2, new_invvar", np.median(invvar[I]), np.median(chi2[I]), np.median(new_invvar[I])
+        print("median invvar, chi2, new_invvar", np.median(invvar[I]), np.median(chi2[I]), np.median(new_invvar[I]))
     return synthesize_image(data1, new_invvar, data2), new_invvar
 
 def synthesize_and_plot(fn1, fn2, fn, maskzero=False):
@@ -177,4 +177,5 @@ if False:
     new = np.random.normal(size=(1700, 1500))
     weight = np.ones((1700, 1500))
     old = np.random.uniform(size=(1700, 1500))
-    print new - synthesize_image(new, weight, old)
+    print(new - synthesize_image(new, weight, old))
+
