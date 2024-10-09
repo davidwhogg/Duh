@@ -150,8 +150,10 @@ def synthesize_and_plot(data1, data2, fn, maskzero=False):
     plt.title("synthetic version of first image")
 
     plt.subplot(235)
-    vmax = (vmax1 - vmin1) / 2.
-    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", origin="lower", cmap="RdBu", vmin=-vmax, vmax=vmax)
+    foo = np.nanpercentile(data1, 16.)
+    bar = np.nanpercentile(data1, 50.)
+    vmax = 5. * (bar - foo) # 5 sigma?
+    plt.imshow(resid12[y1: y2, x1: x2], interpolation="nearest", origin="lower", vmin=-vmax, vmax=vmax)
     plt.title("residual")
 
     plt.subplot(236)
